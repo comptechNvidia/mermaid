@@ -1,0 +1,64 @@
+# This workflow generates an SLSA provenance file for your project.
+# It satisfies level 3 for provenance requirements as per the SLSA specifications.
+# The project is an initiative of the OpenSSF (openssf.org) and is developed at
+# https://github.com/slsa-framework/slsa-github-generator.
+# For more information on SLSA and how it enhances software supply chain security, visit slsa.dev.
+
+name: SLSA Generic Generator
+
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      digests: ${{ steps.hash.outputs.digests }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # ========================================================
+      #
+      # Step 1: Build your artifacts.
+      #
+      # Replace the below example commands with your actual build steps.
+      #
+      # ========================================================
+      - name: Build Artifacts
+        run: |
+          echo "artifact1" > artifact1
+          echo "artifact2" > artifact2
+
+      # ========================================================
+      #
+      # Step 2: Generate provenance subject hashes.
+      # Ensure to include all binaries that you want provenance for.
+      #
+      # ========================================================
+      - name: Generate Subject for Provenance
+        id: hash
+        run: |
+          set -euo pipefail
+
+          # List the artifacts for provenance.
+          files=$(ls artifact*)
+          # Generate the SHA256 hashes and encode them in base64.
+          echo "hashes=$(sha256sum $files | base64 -w0)" >> "${GITHUB_OUTPUT}"
+
+  provenance:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read   # Required to read the workflow path.
+      id-token: write  # Required to sign the provenance.
+      contents: write  # Required to add assets to a release.
+      
+    # Utilize the SLSA generator action to create the provenance file.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.4.0
+    with:
+      base64-subjects: "${{ needs.build.outputs.digests }}"
+      upload-assets: true # Optional: Automatically upload to a new release
